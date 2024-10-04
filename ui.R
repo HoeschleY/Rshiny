@@ -1,3 +1,24 @@
+# Function to install or update a package
+install_or_update <- function(package_name) {
+  if (!requireNamespace(package_name, quietly = TRUE)) {
+    # Package is not installed, install it
+    install.packages(package_name)
+  } else {
+    # Package is installed, update it
+    update.packages(package_name, ask = FALSE)
+  }
+}
+
+
+install_or_update("shiny")
+install_or_update("httr")
+install_or_update("jsonlite")
+install_or_update("reactable")
+install_or_update("ggplot2")
+install_or_update("jpeg")
+install_or_update("dplyr")
+
+
 library(shiny)
 library(httr)
 library(jsonlite)
