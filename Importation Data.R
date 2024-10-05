@@ -98,3 +98,4 @@ map <- leaflet(df_filtered) %>%
 
 # Show the map
 map
+
