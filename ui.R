@@ -5,21 +5,29 @@ library(reactable)
 library(ggplot2)
 library(jpeg)
 library(dplyr)
+library(bslib)
+library(leaflet)
+library(mapview)
+library(plotly)
+library(DT)
 
 # Données
-df <- read.csv("data/existants_69.csv", header = T, dec = ".", sep =",")
-cpr <- distinct(df,df$`Code_postal_(BAN)`,)
-cpr
+df_69 <- read.csv("data/df_69.csv", header = T, dec = ".", sep =",")
+df_adresses <- read.csv("data/df_adresses.csv", header = T, dec = ".", sep =",")
+
 
 navbarPage(
-
-  title = tags$img(src = "img/logo.jng"), # A CORRIGER
+  
+  tagList(
+    tags$img(src = "logo.png", height = "30px"),  # Ajustez la hauteur selon vos besoins
+  ),
   
   # Onglet 1
   tabPanel("Projet",
            h1("Impacte de la classe (DPE) sur les
 consommations électriques des logements du Rhône"),
-           p("This is some text on the first tab.")
+           plotOutput("donutPlot")
+           
   ),
   
   # Onglet 2
@@ -32,20 +40,24 @@ consommations électriques des logements du Rhône"),
                     selectInput("date_reception_DPE",
                                 "Date de réception DPE:",
                                 c("All",
-                                  unique(as.character(df$Date_réception_DPE))))
+                                  unique(as.character(df_69$Date_réception_DPE))))
              ),
              # A FINIR
              column(4,
-                    selectInput("trans",
+                    selectInput("cp",
                                 "Code postal:",
                                 c("All",
-                                  unique(as.character(cpr$df$`Code_postal_(BAN)`))))
+                                  unique(as.character(df_69$`Code_postal_(BAN)`))))
              ),
              column(4,
                     selectInput("Etiquette_DPE",
                                 "Etiquette DPE:",
                                 c("All",
-                                  unique(as.character(df$Etiquette_DPE))))
+                                  unique(as.character(df_69$Etiquette_DPE))))
+             ),
+             column(4,
+                    textInput("filename", "Nom de fichier :", value = "data"),
+                    downloadButton("downloadData", "Télécharger CSV")
              )
            ),
            # Affiche le tableau
@@ -53,8 +65,10 @@ consommations électriques des logements du Rhône"),
   ),
   
   # Onglet 3
-  tabPanel("Tab 3",
-           h1("Content for Tab 3"),
-           p("This is some text on the third tab.")
+  tabPanel("Carte",
+           tags$div(
+             style = "display: flex; justify-content: center; align-items: center; height: 90vh; margin: 0;",
+             tags$iframe(src = "map.html", height = "100%", width = "100%", style = "border: none;")
+           )
   )
 )
