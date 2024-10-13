@@ -20,7 +20,11 @@ df_var_quanti <- read.csv("data/df_var_quanti.csv", header = TRUE, dec = ".", se
 df_adresses <- read.csv("data/df_adresses.csv", header = TRUE, dec = ".", sep = ",")
 df_labels <- read.csv("data/df_labels.csv", header = TRUE, dec = ".", sep = ",")
 df_conso_cout <- read.csv("data/df_conso_cout.csv", header = TRUE, dec = ".", sep = ",")
-df_filtered <- read.csv("data/df_filtered.csv")
+df_filtered <- read.csv("data/df_filtered2.csv")
+
+# Rename the columns for consistency
+colnames(df_filtered)[colnames(df_filtered) == "Code_postal_.BAN."] <- "Code_postal"
+colnames(df_69)[colnames(df_69) == "Code_postal_.BAN."] <- "Code_postal"
 
 # Copie pour avoir acces et telecharger le PNG (*1)
 df_plot <- df_labels %>%
@@ -34,7 +38,7 @@ users <- data.frame(
 )
 
 # Global Plot
-vals <- reactiveValues(plot_data = NULL)
+regplot <- reactiveValues(plot_data = NULL)
 
 
 function(input, output, session) {
@@ -110,7 +114,7 @@ function(input, output, session) {
   
   # KPI 5 : Nombre de codes postaux uniques
   output$kpi5 <- renderValueBox({
-    nb_cp_uniques <- n_distinct(df_filtered$Code_postal_.BAN.)
+    nb_cp_uniques <- n_distinct(df_filtered$Code_postal)
     valueBox(value = nb_cp_uniques, subtitle = "Codes postaux uniques couverts", icon = icon("map-marker-alt"), color = "fuchsia")
   })
   
@@ -128,7 +132,7 @@ function(input, output, session) {
       data <- data[data$Date_réception_DPE == input$date_reception_DPE, ]
     }
     if (input$cp != "All") {
-      data <- data[data$Code_postal_.BAN. == input$cp, ]
+      data <- data[data$Code_postal == input$cp, ]
     }
     if (input$Etiquette_DPE != "All") {
       data <- data[data$Etiquette_DPE == input$Etiquette_DPE, ]
@@ -150,6 +154,30 @@ function(input, output, session) {
       write.csv(filtered_data(), file, row.names = FALSE)
     }
   )
+  
+  ################## Map Logic ##################
+  filtered_data1 <- reactive({
+    if (is.null(input$df_69) || length(input$df_69) == 0) {
+      df_filtered
+    } else {
+      df_filtered %>%
+        filter(Etiquette_DPE %in% input$df_69)
+    }
+  })
+  
+  output$map <- renderLeaflet({
+    leaflet(filtered_data1()) %>%
+      addTiles() %>%
+      addMarkers(lng = ~lon, lat = ~lat,
+                 popup = ~paste(
+                   "<b>Etiquette DPE:</b>", Etiquette_DPE, "<br>",
+                   "<b>Postal Code:</b>", Code_postal, "<br>",
+                   "<b>Reception Date:</b>", Date_réception_DPE, "<br>",
+                   "<b>Consommation:</b>", Conso_5_usages_é_finale
+                 ),  
+                 clusterOptions = markerClusterOptions())
+  })
+                 
   
   ################## Graphiques ##################
   #Camambert
@@ -176,9 +204,47 @@ function(input, output, session) {
       theme_minimal()
   })
   
+  #Histogram
+  output$histogramPlot <- renderPlot({
+    req(input$y_hist)
+    
+    if (is.numeric(df_filtered[[input$y_hist]])) {
+      histplot <<- ggplot(df_filtered, aes(x = Etiquette_DPE, y = .data[[input$y_hist]])) +
+        stat_summary(fun = "mean", geom = "bar", fill = "blue", color = "white") +
+        labs(title = paste("Moyenne de", input$y_hist, "par Etiquette DPE"),
+             x = "Etiquette DPE", y = paste("Moyenne de", input$y_hist)) +
+        theme_minimal() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1))
+      histplot
+    } else {
+      ggplot() +
+        annotate("text", x = 0.5, y = 0.5, label = "La variable sélectionnée n'est pas numérique.", size = 6) +
+        theme_void()
+    }
+  })
+  
+  #Boxplot
+  output$boxplotPlot <- renderPlot({
+    req(input$y_box)
+    
+    if (is.numeric(df_filtered[[input$y_box]])) {
+     b <<- ggplot(df_filtered, aes(x = Etiquette_DPE, y = .data[[input$y_box]])) +
+        geom_boxplot(fill = "lightblue") +
+        labs(title = paste("Boîte à Moustache de", input$y_box, "par Etiquette DPE"),
+             x = "Etiquette DPE", y = input$y_box) +
+        theme_minimal() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1))
+     b
+    } else {
+      ggplot() +
+        annotate("text", x = 0.5, y = 0.5, label = "La variable sélectionnée n'est pas numérique.", size = 6) +
+        theme_void()
+    }
+  })
+  
   ################## Téléchargement des Graphiques ##################
   
-  # Exporter le graphique en PNG (*1)
+  # Camambert
   output$downloadPlot1 <- downloadHandler(
     filename = function() {
       paste("graphique", Sys.Date(), ".png", sep = "")
@@ -194,7 +260,7 @@ function(input, output, session) {
     }
   )
   
-  # Exporter le graphique en PNG
+  # Nuage de point
   output$downloadPlot2 <- downloadHandler(
     filename = function() {
       paste("graphique", Sys.Date(), ".png", sep = "")
@@ -207,6 +273,42 @@ function(input, output, session) {
               geom_point(size = 3) +
               theme_minimal())
       dev.off()  # Fermer le fichier PNG
+    }
+  )
+  
+  # Histogramme
+  output$downloadPlot3 <- downloadHandler(
+    filename = function() {
+      paste("graphique", Sys.Date(), ".png", sep = "")
+    },
+    content = function(file) {
+      png(file)  # Ouvrir un fichier PNG
+      print(histplot)
+      dev.off()  # Fermer le fichier PNG
+    }
+  )
+  
+  # Boxplot
+  output$downloadPlot4 <- downloadHandler(
+    filename = function() {
+      paste("graphique", Sys.Date(), ".png", sep = "")
+    },
+    content = function(file) {
+      png(file)  # Ouvrir un fichier PNG
+      print(b)
+      dev.off()  # Fermer le fichier PNG
+    }
+  )
+  
+  # Telechargement regression plot
+  output$downloadPlot5 <- downloadHandler(
+    filename = function() {
+      paste("regression_plot_", Sys.Date(), ".png", sep = "")
+    },
+    content = function(file) {
+      png(file)
+      print(regplot$plot_data)  # Utiliser le plot stocké dans la variable réactive
+      dev.off()
     }
   )
   
@@ -290,21 +392,36 @@ function(input, output, session) {
         geom_point() +
         geom_smooth(method = "lm", se = FALSE) +
         labs(title = "Régression Linéaire", x = input$x_axis, y = input$y_axis)
-      vals$plot_data <- plot  # Stocker le plot dans la variable réactive    
+      regplot$plot_data <- plot  # Stocker le plot dans la variable réactive
       plot
       })
   })
   
-  output$downloadPlot3 <- downloadHandler(
-    filename = function() {
-      paste("regression_plot_", Sys.Date(), ".png", sep = "")
-    },
-    content = function(file) {
-      png(file)
-      print(vals$plot_data)  # Utiliser le plot stocké dans la variable réactive
-      dev.off()
-    }
-  )
+  ################## Regression Plot with Correlation Ratio ##################
+  observeEvent(input$plot_regression, {
+    output$regressionPlot <- renderPlot({
+      if (input$x_axis %in% colnames(df_var_quanti) && input$y_axis %in% colnames(df_var_quanti)) {
+        ggplot(df_var_quanti, aes_string(x = input$x_axis, y = input$y_axis)) +
+          geom_point() +
+          geom_smooth(method = "lm", se = FALSE, color = "blue") +
+          labs(title = paste("Regression Plot:", input$y_axis, "vs", input$x_axis),
+               x = input$x_axis, y = input$y_axis) +
+          theme_minimal()
+      } else {
+        plot.new()
+        text(0.5, 0.5, "Sélection invalide des axes X ou Y", cex = 2)
+      }
+    })
+    
+    # Calculate and display the correlation ratio
+    output$correlation_ratio <- renderText({
+      x_data <- df_var_quanti[[input$x_axis]]
+      y_data <- df_var_quanti[[input$y_axis]]
+      correlation <- round(cor(x_data, y_data, use = "complete.obs"), 2)
+      paste("Correlation Ratio:", correlation)
+    })
+  })
+  
   ################## Mise à jour des données ##################
   
   observeEvent(input$update_button, {
@@ -319,13 +436,6 @@ function(input, output, session) {
     
     shinyjs::enable("update_button")
     output$update_status <- renderText("Mise à jour terminée.")
-  })
-  
-  ################## Autres fonctionnalités ##################
-  
-  # Map HTML
-  output$carte_html <- renderUI({
-    includeHTML("map.html")
   })
 }
 

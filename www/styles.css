@@ -9,3 +9,12 @@
     text-transform: uppercase;   /* Mettre le texte en majuscules */
     font-weight: bold;          /* Mettre le texte en gras */
 }
+
+h1 {
+  color : #7A1CAC;
+  font-weight: bold;
+}
+
+#h2 {
+  color: #7A1CAC; 
+}
